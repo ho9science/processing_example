@@ -1,4 +1,6 @@
 import oscP5.*;
+import java.util.Collection;
+import javax.sound.midi.*;
 import http.requests.*;
 
 // OSC loading stuff
@@ -18,12 +20,13 @@ int notes[] = {};
 int velocities[] = {};
 float starttimes[] = {};
 float endtimes[] = {};
+AMidiPlayer midiPlayer;
 
 void setup() {
   size(640, 360);
   stroke(255);
   background(0);
-
+  midiPlayer = new AMidiPlayer();
   o = new OscP5(this, 2346);  //set a port number - it has to be same as in your Max for Live device
   //myRemoteLocation = new NetAddress("127.0.0.1", 2346);
   
@@ -51,7 +54,8 @@ void draw() {
 
 String interplay(String jsonData){
   PostRequest post = new PostRequest("http://127.0.0.1:8000/api/v2/midi/json/", "UTF-8");
-  post.addData("midi", jsonData);
+  post.addHeader("Content-Type", "application/json");
+  post.addJson(jsonData);
   post.send();
   return post.getContent();
 }
@@ -69,10 +73,51 @@ void oscEvent(OscMessage theMsg) {
       note1 = theMsg.get(0).intValue();
       duration1 = map(sq(note1), 1, sq(127), 0.05, 0.5);
       //println(note1+"|"+duration1);
+      if(result==7){
+        
+        JSONArray values = new JSONArray();
+  
+        for(int i = 0; i < notes.length; i++){
+          if(notes[i]==0){
+            break;
+          }
+          JSONObject midi = new JSONObject();
+          midi.setInt("note", notes[i]);
+          midi.setInt("velocity", velocities[i]);
+          midi.setFloat("starttime",starttimes[i]);
+          midi.setFloat("endtime",endtimes[i]);
+          values.setJSONObject(i, midi);
+        }
+        //println(values);
+        String midiPath = interplay(values.toString());
+        midiPlayer.load(midiPath.replaceAll("\"", "")); //input midi file path
+        midiPlayer.start();
+        for (Note n : midiPlayer.getNotes()) {
+          fill(map(n.note % 12, 0, 11, 0, 255), 
+            map(n.channel, 0, 15, 80, 255), 
+            map(n.note, 0, 127, 100, 255) * random(0.9, 1.0));
       
+          pushMatrix();
+          float t = frameCount * 0.003;
+          scale(n.velocity * 0.05);
+          rotateX(n.channel + noise(n.note * 0.1, t));
+          rotateY(n.note * 0.06);
+          rotateZ(map(n.note % 12, 0, 12, 0, TWO_PI));
+          pushMatrix();
+          translate(0, n.velocity * 0.7, 0);
+          box(40.0 / n.living, n.velocity * 0.1 + random(10), 40.0 / n.living);
+          popMatrix();    
+          translate(0, 5000.0, 0);
+          box(0.2, 10000, 0.2);
+          popMatrix();
+        }
+        midiPlayer.update();
+      }
       if(count==1){  
         //println((millis()-mills)/1000.0);
         float endtime = (millis()-mills)/1000.0 + starttime;
+        println(endtime);
+        endtime = round(endtime*100)/100.0;
         mills = millis();
         println(note1+"|"+velocity1+"|"+starttime+"|"+endtime);
         notes = (int[])append(notes, note1);
@@ -90,23 +135,7 @@ void oscEvent(OscMessage theMsg) {
         println(mills);
         initial = false;
       }
-      if(result==7){
-        JSONArray values = new JSONArray();
-  
-        for(int i = 0; i < notes.length; i++){
-          if(notes[i]==0){
-            break;
-          }
-          JSONObject midi = new JSONObject();
-          midi.setInt("note", notes[i]);
-          midi.setInt("velocity", velocities[i]);
-          midi.setFloat("starttime",starttimes[i]);
-          midi.setFloat("endtime",endtimes[i]);
-          values.setJSONObject(i, midi);
-        }
-        //println(values);
-        interplay(values.toString());
-      }
+      
   }
 }
 
