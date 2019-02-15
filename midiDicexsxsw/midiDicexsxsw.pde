@@ -31,13 +31,16 @@ void setup() {
   //myRemoteLocation = new NetAddress("127.0.0.1", 2346);
   
   string1=new B_String (width*0.1, width*0.3 , width*0.7, width*0.9, height*0.2, 250);
-  
+  string2=new B_String (width*0.1, width*0.3 , width*0.7, width*0.9, height*0.3, 50);
+
 } 
 
 int velocity1, velocity2, velocity3, velocity4, velocity5, velocity6, velocity7, velocity8 = 0;
 float ver_move1, ver_move2, ver_move3, ver_move4, ver_move5, ver_move6, ver_move7, ver_move8;
 float duration1, duration2, duration3, duration4, duration5, duration6, duration7, duration8;
 int note1, note2, note3, note4, note5, note6, note7, note8  = 0;
+boolean trigger = false;
+JSONArray values = new JSONArray();
 
 void draw() {
   background(0);
@@ -46,10 +49,24 @@ void draw() {
   //stroke(250, 0, 0);
   
   string1.display(ver_move1);
-  
+  string2.display(ver_move2);
   if (ver_move1>0){
     ver_move1 = ver_move1 -duration1;}
+  
+  if (ver_move2>0){
+    ver_move2 = ver_move2 -duration2;}
+    
   ver_move1 = - ver_move1;
+  ver_move2 = - ver_move2;
+  
+  if(trigger){
+    String midiPath = interplay(values.toString());
+    midiPlayer.load(midiPath.replaceAll("\"", "")); //input midi file path
+    midiPlayer.start();
+    trigger = false;
+  }
+  changeBackground(midiPlayer);
+  midiPlayer.update();
 }
 
 String interplay(String jsonData){
@@ -73,10 +90,7 @@ void oscEvent(OscMessage theMsg) {
       note1 = theMsg.get(0).intValue();
       duration1 = map(sq(note1), 1, sq(127), 0.05, 0.5);
       //println(note1+"|"+duration1);
-      if(result==7){
-        
-        JSONArray values = new JSONArray();
-  
+      if(result==21){
         for(int i = 0; i < notes.length; i++){
           if(notes[i]==0){
             break;
@@ -89,29 +103,7 @@ void oscEvent(OscMessage theMsg) {
           values.setJSONObject(i, midi);
         }
         //println(values);
-        String midiPath = interplay(values.toString());
-        midiPlayer.load(midiPath.replaceAll("\"", "")); //input midi file path
-        midiPlayer.start();
-        for (Note n : midiPlayer.getNotes()) {
-          fill(map(n.note % 12, 0, 11, 0, 255), 
-            map(n.channel, 0, 15, 80, 255), 
-            map(n.note, 0, 127, 100, 255) * random(0.9, 1.0));
-      
-          pushMatrix();
-          float t = frameCount * 0.003;
-          scale(n.velocity * 0.05);
-          rotateX(n.channel + noise(n.note * 0.1, t));
-          rotateY(n.note * 0.06);
-          rotateZ(map(n.note % 12, 0, 12, 0, TWO_PI));
-          pushMatrix();
-          translate(0, n.velocity * 0.7, 0);
-          box(40.0 / n.living, n.velocity * 0.1 + random(10), 40.0 / n.living);
-          popMatrix();    
-          translate(0, 5000.0, 0);
-          box(0.2, 10000, 0.2);
-          popMatrix();
-        }
-        midiPlayer.update();
+        trigger = true;
       }
       if(count==1){  
         //println((millis()-mills)/1000.0);
@@ -136,6 +128,15 @@ void oscEvent(OscMessage theMsg) {
         initial = false;
       }
       
+  }
+}
+void changeBackground(AMidiPlayer midiPlayer) {
+  for (Note n : midiPlayer.getNotes()) {
+    //note2 = n.note;
+    //duration2 = map(sq(note2), 1, sq(127), 0.05, 0.5);
+    background(map(n.note % 12, 0, 11, 0, 255), 
+      map(n.channel, 0, 15, 80, 255), 
+      map(n.note, 0, 127, 100, 255) * random(0.9, 1.0));
   }
 }
 
